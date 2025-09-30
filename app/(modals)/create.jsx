@@ -23,6 +23,13 @@ const CATEGORIES = [
   { id: "transportation", name: "Transportation", icon: "car", type: "expense" },
   { id: "entertainment", name: "Entertainment", icon: "film", type: "expense" },
   { id: "bills", name: "Bills", icon: "receipt", type: "expense" },
+  { id: "upi", name: "UPI", icon: "phone-portrait", type: "expense" },
+  { id: "banking", name: "Banking", icon: "card", type: "expense" },
+  { id: "investment", name: "Investment", icon: "trending-up", type: "expense" },
+  { id: "healthcare", name: "Healthcare", icon: "medical", type: "expense" },
+  { id: "education", name: "Education", icon: "school", type: "expense" },
+  { id: "travel", name: "Travel", icon: "airplane", type: "expense" },
+  { id: "subscription", name: "Subscription", icon: "refresh", type: "expense" },
   { id: "income", name: "Income", icon: "cash", type: "income" },
   { id: "other", name: "Other", icon: "ellipsis-horizontal", type: "expense" },
 ];

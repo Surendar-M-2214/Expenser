@@ -11,11 +11,18 @@ const CATEGORY_ICONS = {
   Transportation: { icon: "car", type: "expense" },
   Entertainment: { icon: "film", type: "expense" },
   Bills: { icon: "receipt", type: "expense" },
+  UPI: { icon: "phone-portrait", type: "expense" },
+  Banking: { icon: "card", type: "expense" },
+  Investment: { icon: "trending-up", type: "expense" },
+  Healthcare: { icon: "medical", type: "expense" },
+  Education: { icon: "school", type: "expense" },
+  Travel: { icon: "airplane", type: "expense" },
+  Subscription: { icon: "refresh", type: "expense" },
   Income: { icon: "cash", type: "income" },
   Other: { icon: "ellipsis-horizontal", type: "expense" },
 };
 
-export const TransactionItem = ({ item, onDelete }) => {
+export const TransactionItem = ({ item, onDelete, onPress }) => {
   // Backend uses 'type' field: 'credit' for income, 'debit' for expense
   const isIncome = item.type === 'credit';
   const categoryInfo = CATEGORY_ICONS[item.category] || { icon: "pricetag-outline", type: "expense" };
@@ -26,7 +33,7 @@ export const TransactionItem = ({ item, onDelete }) => {
 
   return (
     <View style={styles.transactionCard} key={item.id}>
-      <TouchableOpacity style={styles.transactionContent}>
+      <TouchableOpacity style={styles.transactionContent} onPress={() => onPress && onPress(item)}>
         <View style={styles.categoryIconContainer}>
           <Ionicons name={iconName} size={22} color={iconColor} />
         </View>
@@ -35,6 +42,9 @@ export const TransactionItem = ({ item, onDelete }) => {
             {item.description || item.title || 'Transaction'}
           </Text>
           <Text style={styles.transactionCategory}>{item.category}</Text>
+          {item.reference && (
+            <Text style={styles.transactionReference}>Ref: {item.reference}</Text>
+          )}
         </View>
         <View style={styles.transactionRight}>
           <Text

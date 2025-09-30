@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Alert, ScrollView, TextInput, ActivityIndicator, Modal } from "react-native";
+import { View, Text, TouchableOpacity, Alert, ScrollView, ActivityIndicator, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { styles } from "../../assets/styles/home.styles";
 import { COLORS } from "../../constants/colors";
@@ -7,15 +7,19 @@ import { useState } from "react";
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useUser } from "@clerk/clerk-expo";
+import MoneyLoadingAnimation from "../../components/MoneyLoadingAnimation";
+import TransactionPreviewModal from "../../components/TransactionPreviewModal";
+import { TransactionItem } from "../../components/TransactionItem";
 
 export default function UploadScreen() {
   const { user } = useUser();
   const [isUploading, setIsUploading] = useState(false);
   const [extractedData, setExtractedData] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [previewModalVisible, setPreviewModalVisible] = useState(false);
 
   const handleFileUpload = async (file) => {
     if (!user?.id) {
@@ -31,23 +35,82 @@ export default function UploadScreen() {
       formData.append('file', file);
       formData.append('userId', user.id);
       
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+      
       const response = await fetch(`${API_URL}/upload/file`, {
         method: 'POST',
-        body: formData
+        body: formData,
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       const data = await response.json();
       
       if (data.success) {
         setExtractedData(data.data);
-        setTransactions(data.data.transactions);
+        // Format transactions with proper IDs and structure for TransactionItem
+        const formattedTransactions = data.data.transactions.map((transaction, index) => ({
+          id: `upload-${index}-${Date.now()}`, // Unique ID for upload transactions
+          title: transaction.title, // User-friendly title from AI
+          description: transaction.description, // Exact description from file
+          amount: transaction.amount,
+          category: transaction.category,
+          type: transaction.type,
+          transaction_date: transaction.date,
+          date: transaction.date,
+          reference: transaction.reference,
+          created_at: new Date().toISOString()
+        }));
+        setTransactions(formattedTransactions);
         setShowPreview(true);
       } else {
-        Alert.alert('Error', 'Error processing file: ' + data.error);
+        // Handle different types of errors
+        let errorMessage = 'Error processing file: ' + data.error;
+        
+        if (data.error && data.error.includes('503')) {
+          errorMessage = 'AI service is temporarily overloaded. Please try again in a few minutes.';
+        } else if (data.error && data.error.includes('overloaded')) {
+          errorMessage = 'AI service is busy. Please try again later.';
+        } else if (data.error && data.error.includes('quota')) {
+          errorMessage = 'AI service quota exceeded. Please try again later.';
+        } else if (data.error && data.error.includes('timeout')) {
+          errorMessage = 'Request timed out. Please try again.';
+        } else if (data.error && data.error.includes('network')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        }
+        
+        Alert.alert('Processing Error', errorMessage, [
+          { text: 'OK', style: 'default' },
+          { text: 'Retry', style: 'default', onPress: () => handleFileUpload(file) }
+        ]);
       }
     } catch (error) {
       console.error('Upload error:', error);
-      Alert.alert('Error', 'Error uploading file: ' + error.message);
+      
+      let errorMessage = 'Error uploading file: ' + error.message;
+      
+      // Handle specific error types
+      if (error.name === 'AbortError') {
+        errorMessage = 'Request timed out. AI processing is taking longer than expected. Please try again.';
+      } else if (error.message.includes('Network request failed') || error.message.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (error.message.includes('503') || error.message.includes('overloaded')) {
+        errorMessage = 'AI service is temporarily overloaded. Please try again in a few minutes.';
+      } else if (error.message.includes('quota') || error.message.includes('limit')) {
+        errorMessage = 'AI service quota exceeded. Please try again later.';
+      } else if (error.message.includes('JSON')) {
+        errorMessage = 'Invalid response from server. Please try again.';
+      }
+      
+      Alert.alert('Upload Error', errorMessage, [
+        { text: 'OK', style: 'default' },
+        { text: 'Retry', style: 'default', onPress: () => handleFileUpload(file) }
+      ]);
     } finally {
       setIsUploading(false);
     }
@@ -76,39 +139,110 @@ export default function UploadScreen() {
         setTransactions([]);
         setShowPreview(false);
       } else {
-        Alert.alert('Error', 'Error saving transactions: ' + data.error);
+        let errorMessage = 'Error saving transactions: ' + data.error;
+        
+        if (data.error && data.error.includes('network')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (data.error && data.error.includes('timeout')) {
+          errorMessage = 'Request timed out. Please try again.';
+        } else if (data.error && data.error.includes('database')) {
+          errorMessage = 'Database error. Please try again.';
+        }
+        
+        Alert.alert('Save Error', errorMessage, [
+          { text: 'OK', style: 'default' },
+          { text: 'Retry', style: 'default', onPress: handleSaveTransactions }
+        ]);
       }
     } catch (error) {
       console.error('Save error:', error);
-      Alert.alert('Error', 'Error saving transactions: ' + error.message);
+      
+      let errorMessage = 'Error saving transactions: ' + error.message;
+      
+      if (error.message.includes('Network request failed') || error.message.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.message.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (error.message.includes('JSON')) {
+        errorMessage = 'Invalid response from server. Please try again.';
+      }
+      
+      Alert.alert('Save Error', errorMessage, [
+        { text: 'OK', style: 'default' },
+        { text: 'Retry', style: 'default', onPress: handleSaveTransactions }
+      ]);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleEditTransaction = (index) => {
-    setEditingTransaction(index);
-  };
-
-  const handleUpdateTransaction = (index, field, value) => {
-    const updatedTransactions = [...transactions];
-    updatedTransactions[index] = {
-      ...updatedTransactions[index],
-      [field]: value
-    };
-    setTransactions(updatedTransactions);
-  };
-
-  const handleDeleteTransaction = (index) => {
-    const updatedTransactions = transactions.filter((_, i) => i !== index);
-    setTransactions(updatedTransactions);
-  };
 
   const handleCancelPreview = () => {
     setExtractedData(null);
     setTransactions([]);
-    setEditingTransaction(null);
     setShowPreview(false);
+  };
+
+  const handleTransactionPress = (transaction) => {
+    // Convert the upload transaction format to the format expected by TransactionPreviewModal
+    const formattedTransaction = {
+      id: transaction.id, // Use the transaction ID from the item
+      title: transaction.title, // User-friendly title
+      description: transaction.description, // Exact description from file
+      amount: transaction.amount,
+      category: transaction.category,
+      type: transaction.type,
+      transaction_date: transaction.transaction_date || transaction.date,
+      reference: transaction.reference,
+      user_id: user?.id || 'current-user'
+    };
+    setSelectedTransaction(formattedTransaction);
+    setPreviewModalVisible(true);
+  };
+
+  const handlePreviewModalClose = () => {
+    setPreviewModalVisible(false);
+    setSelectedTransaction(null);
+  };
+
+  const handleTransactionUpdate = (updatedTransaction) => {
+    // Update the transaction in the local transactions array
+    const transactionIndex = transactions.findIndex(t => t.id === updatedTransaction.id);
+    if (transactionIndex !== -1) {
+      const updatedTransactions = [...transactions];
+      updatedTransactions[transactionIndex] = {
+        ...updatedTransactions[transactionIndex],
+        title: updatedTransaction.title || updatedTransaction.description,
+        description: updatedTransaction.description,
+        amount: updatedTransaction.amount,
+        category: updatedTransaction.category,
+        type: updatedTransaction.type,
+        transaction_date: updatedTransaction.transaction_date,
+        date: updatedTransaction.transaction_date,
+        reference: updatedTransaction.reference
+      };
+      setTransactions(updatedTransactions);
+    }
+    setPreviewModalVisible(false);
+    setSelectedTransaction(null);
+  };
+
+  const handleDeleteTransaction = (transactionId) => {
+    Alert.alert(
+      "Delete Transaction", 
+      "Are you sure you want to delete this transaction from the upload list?", 
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive", 
+          onPress: () => {
+            const updatedTransactions = transactions.filter(t => t.id !== transactionId);
+            setTransactions(updatedTransactions);
+          }
+        }
+      ]
+    );
   };
 
   const handleReceiptUpload = async () => {
@@ -244,7 +378,7 @@ export default function UploadScreen() {
               {isUploading ? (
                 <ActivityIndicator size="small" color={COLORS.primary} />
               ) : (
-                <Ionicons name="receipt" size={24} color={COLORS.primary} />
+              <Ionicons name="receipt" size={24} color={COLORS.primary} />
               )}
             </View>
             <View style={styles.uploadContent}>
@@ -268,7 +402,7 @@ export default function UploadScreen() {
               {isUploading ? (
                 <ActivityIndicator size="small" color={COLORS.primary} />
               ) : (
-                <Ionicons name="document-text" size={24} color={COLORS.primary} />
+              <Ionicons name="document-text" size={24} color={COLORS.primary} />
               )}
             </View>
             <View style={styles.uploadContent}>
@@ -292,7 +426,7 @@ export default function UploadScreen() {
               {isUploading ? (
                 <ActivityIndicator size="small" color={COLORS.primary} />
               ) : (
-                <Ionicons name="camera" size={24} color={COLORS.primary} />
+              <Ionicons name="camera" size={24} color={COLORS.primary} />
               )}
             </View>
             <View style={styles.uploadContent}>
@@ -337,169 +471,73 @@ export default function UploadScreen() {
             <View style={{ width: 24 }} />
           </View>
 
-          <ScrollView style={styles.content}>
-            {extractedData && (
-              <View style={styles.card}>
-                <Text style={[styles.sectionTitle, { marginBottom: 10 }]}>
-                  {extractedData.fileName}
-                </Text>
-                <Text style={[styles.textLight, { marginBottom: 20 }]}>
-                  {extractedData.totalTransactions} transactions found
-                </Text>
+          <View style={styles.modalContent}>
+            <ScrollView style={styles.scrollableContent} showsVerticalScrollIndicator={false}>
+              {extractedData && (
+                <View style={styles.card}>
+                  <Text style={[styles.sectionTitle, { marginBottom: 10 }]}>
+                    {extractedData.fileName}
+                  </Text>
+                  <Text style={[styles.textLight, { marginBottom: 20 }]}>
+                    {extractedData.totalTransactions} transactions found
+                  </Text>
 
-                {/* Transaction List */}
-                {transactions.map((transaction, index) => (
-                  <View key={`transaction-${index}-${transaction.date}-${transaction.amount}`} style={styles.transactionCard}>
-                    <View style={styles.transactionContent}>
-                      <View style={styles.transactionLeft}>
-                        <Text style={styles.transactionTitle}>
-                          {editingTransaction === index ? (
-                            <TextInput
-                              style={[styles.input, { fontSize: 16, marginBottom: 4 }]}
-                              value={transaction.description}
-                              onChangeText={(value) => handleUpdateTransaction(index, 'description', value)}
-                              placeholder="Description"
-                            />
-                          ) : (
-                            transaction.description
-                          )}
-                        </Text>
-                        <Text style={styles.transactionCategory}>
-                          {editingTransaction === index ? (
-                            <TextInput
-                              style={[styles.input, { fontSize: 14, marginBottom: 8 }]}
-                              value={transaction.category}
-                              onChangeText={(value) => handleUpdateTransaction(index, 'category', value)}
-                              placeholder="Category"
-                            />
-                          ) : (
-                            transaction.category
-                          )}
-                        </Text>
-                        <Text style={styles.transactionDate}>
-                          {editingTransaction === index ? (
-                            <TextInput
-                              style={[styles.input, { fontSize: 12 }]}
-                              value={transaction.date}
-                              onChangeText={(value) => handleUpdateTransaction(index, 'date', value)}
-                              placeholder="YYYY-MM-DD"
-                            />
-                          ) : (
-                            transaction.date
-                          )}
-                        </Text>
-                      </View>
-                      <View style={styles.transactionRight}>
-                        <Text style={[
-                          styles.transactionAmount,
-                          { color: transaction.type === 'credit' ? COLORS.success : COLORS.error }
-                        ]}>
-                          {editingTransaction === index ? (
-                            <TextInput
-                              style={[styles.input, { fontSize: 16, textAlign: 'right' }]}
-                              value={transaction.amount.toString()}
-                              onChangeText={(value) => handleUpdateTransaction(index, 'amount', parseFloat(value))}
-                              placeholder="0.00"
-                              keyboardType="numeric"
-                            />
-                          ) : (
-                            `₹${transaction.amount}`
-                          )}
-                        </Text>
-                        <Text style={[
-                          styles.transactionDate,
-                          { color: transaction.type === 'credit' ? COLORS.success : COLORS.error }
-                        ]}>
-                          {editingTransaction === index ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                              <TouchableOpacity
-                                style={[
-                                  styles.typeButton,
-                                  transaction.type === 'debit' && styles.typeButtonActive
-                                ]}
-                                onPress={() => handleUpdateTransaction(index, 'type', 'debit')}
-                              >
-                                <Text style={[
-                                  styles.typeButtonText,
-                                  transaction.type === 'debit' && styles.typeButtonTextActive
-                                ]}>Debit</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                style={[
-                                  styles.typeButton,
-                                  transaction.type === 'credit' && styles.typeButtonActive
-                                ]}
-                                onPress={() => handleUpdateTransaction(index, 'type', 'credit')}
-                              >
-                                <Text style={[
-                                  styles.typeButtonText,
-                                  transaction.type === 'credit' && styles.typeButtonTextActive
-                                ]}>Credit</Text>
-                              </TouchableOpacity>
-                            </View>
-                          ) : (
-                            transaction.type
-                          )}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.transactionActions}>
-                      {editingTransaction === index ? (
-                        <TouchableOpacity
-                          style={styles.actionButton}
-                          onPress={() => setEditingTransaction(null)}
-                        >
-                          <Ionicons name="checkmark" size={20} color={COLORS.success} />
-                        </TouchableOpacity>
-                      ) : (
-                        <TouchableOpacity
-                          style={styles.actionButton}
-                          onPress={() => handleEditTransaction(index)}
-                        >
-                          <Ionicons name="pencil" size={20} color={COLORS.primary} />
-                        </TouchableOpacity>
-                      )}
-                      <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => handleDeleteTransaction(index)}
-                      >
-                        <Ionicons name="trash" size={20} color={COLORS.error} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-
-                {/* Action Buttons */}
-                <View style={styles.previewActions}>
-                  <TouchableOpacity
-                    style={[styles.button, styles.secondaryButton]}
-                    onPress={handleCancelPreview}
-                  >
-                    <Text style={styles.secondaryButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.button,
-                      styles.primaryButton,
-                      (isSaving || transactions.length === 0) && styles.buttonDisabled
-                    ]}
-                    onPress={handleSaveTransactions}
-                    disabled={isSaving || transactions.length === 0}
-                  >
-                    {isSaving ? (
-                      <ActivityIndicator size="small" color={COLORS.white} />
-                    ) : (
-                      <Text style={styles.primaryButtonText}>
-                        Add {transactions.length} Transactions
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+                  {/* Transaction List */}
+                  {transactions.map((transaction) => (
+                    <TransactionItem
+                      key={transaction.id}
+                      item={transaction}
+                      onDelete={handleDeleteTransaction}
+                      onPress={handleTransactionPress}
+                    />
+                  ))}
                 </View>
-              </View>
-            )}
-          </ScrollView>
+              )}
+            </ScrollView>
+
+            {/* Fixed Action Buttons */}
+            <View style={styles.fixedActionButtons}>
+              <TouchableOpacity
+                style={[styles.button, styles.secondaryButton]}
+                onPress={handleCancelPreview}
+              >
+                <Text style={styles.secondaryButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  styles.primaryButton,
+                  (isSaving || transactions.length === 0) && styles.buttonDisabled
+                ]}
+                onPress={handleSaveTransactions}
+                disabled={isSaving || transactions.length === 0}
+              >
+                {isSaving ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <Text style={styles.primaryButtonText}>
+                    Add {transactions.length} Transactions
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
         </View>
+      </View>
       </Modal>
+      
+      {/* Money Loading Animation */}
+      <MoneyLoadingAnimation 
+        visible={isUploading || isSaving} 
+        text={isUploading ? "Processing your file..." : "Saving transactions..."} 
+      />
+
+      {/* Transaction Preview Modal */}
+      <TransactionPreviewModal
+        visible={previewModalVisible}
+        transaction={selectedTransaction}
+        onClose={handlePreviewModalClose}
+        onUpdate={handleTransactionUpdate}
+      />
     </View>
   );
 }

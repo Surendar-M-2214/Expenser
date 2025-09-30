@@ -3,12 +3,14 @@ import { useRouter } from "expo-router";
 import { Alert, FlatList, Image, RefreshControl, Text, TouchableOpacity, View } from "react-native";
 import { SignOutButton } from "@/components/SignOutButton";
 import { useTransactions } from "../../hooks/useTransactions";
+import { useProfile } from "../../hooks/useProfile";
 import { useEffect, useState } from "react";
 import PageLoader from "../../components/PageLoader";
 import { styles } from "../../assets/styles/home.styles";
 import { Ionicons } from "@expo/vector-icons";
 import { BalanceCard } from "../../components/BalanceCard";
 import { TransactionItem } from "../../components/TransactionItem";
+import TransactionPreviewModal from "../../components/TransactionPreviewModal";
 import NoTransactionsFound from "../../components/NoTransactionsFound";
 import ProfileModal from "../(modals)/profile";
 
@@ -17,12 +19,14 @@ export default function Page() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
-  const [profileUpdated, setProfileUpdated] = useState(false);
-  const [updatedProfileImage, setUpdatedProfileImage] = useState(null);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [previewModalVisible, setPreviewModalVisible] = useState(false);
 
-  const { transactions, summary, isLoading, loadData, deleteTransaction, error } = useTransactions(
+  const { transactions, summary, isLoading, loadData, deleteTransaction, updateTransactionInState, error } = useTransactions(
     user?.id
   );
+  
+  const { profileData, refreshProfile } = useProfile();
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -42,9 +46,25 @@ export default function Page() {
   };
 
   const handleProfileUpdate = () => {
-    setProfileUpdated(prev => !prev);
-    // Force refresh of profile image
-    setUpdatedProfileImage(user?.imageUrl);
+    // Refresh profile data from database
+    refreshProfile();
+  };
+
+  const handleTransactionPress = (transaction) => {
+    setSelectedTransaction(transaction);
+    setPreviewModalVisible(true);
+  };
+
+  const handlePreviewModalClose = () => {
+    setPreviewModalVisible(false);
+    setSelectedTransaction(null);
+  };
+
+  const handleTransactionUpdate = (updatedTransaction) => {
+    // Update the transaction in the local state
+    updateTransactionInState(updatedTransaction);
+    setPreviewModalVisible(false);
+    setSelectedTransaction(null);
   };
 
   const displaySummary = summary || { balance: 0, income: 0, expenses: 0 };
@@ -64,11 +84,11 @@ export default function Page() {
               style={styles.profileImageButton}
               activeOpacity={0.7}
             >
-              {(updatedProfileImage || user?.imageUrl) ? (
+              {profileData.profileImage ? (
                 <View style={styles.profileImageContainer}>
                   <Image 
-                    key={`profile-${profileUpdated}-${updatedProfileImage || user.imageUrl}`}
-                    source={{ uri: updatedProfileImage || user.imageUrl }} 
+                    key={`profile-${profileData.profileImage}`}
+                    source={{ uri: profileData.profileImage }} 
                     style={styles.profileImage} 
                   />
                   <View style={styles.profileImageBorder} />
@@ -82,7 +102,7 @@ export default function Page() {
             <View style={styles.welcomeContainer}>
               <Text style={styles.welcomeText}>Welcome,</Text>
               <Text style={styles.usernameText}>
-                {user?.username || user?.emailAddresses[0]?.emailAddress.split("@")[0]}
+                {profileData.username || profileData.email?.split("@")[0] || 'User'}
               </Text>
             </View>
           </View>
@@ -109,7 +129,7 @@ export default function Page() {
         style={styles.transactionsList}
         contentContainerStyle={styles.transactionsListContent}
         data={transactions}
-        renderItem={({ item }) => <TransactionItem item={item} onDelete={handleDelete} />}
+        renderItem={({ item }) => <TransactionItem item={item} onDelete={handleDelete} onPress={handleTransactionPress} />}
         ListEmptyComponent={<NoTransactionsFound />}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -120,6 +140,14 @@ export default function Page() {
         visible={profileModalVisible}
         onClose={() => setProfileModalVisible(false)}
         onProfileUpdated={handleProfileUpdate}
+      />
+
+      {/* Transaction Preview Modal */}
+      <TransactionPreviewModal
+        visible={previewModalVisible}
+        transaction={selectedTransaction}
+        onClose={handlePreviewModalClose}
+        onUpdate={handleTransactionUpdate}
       />
     </View>
   );

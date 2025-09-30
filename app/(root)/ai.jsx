@@ -5,6 +5,7 @@ import { useUser } from "@clerk/clerk-expo";
 import { styles } from "../../assets/styles/home.styles";
 import { COLORS } from "../../constants/colors";
 import { API_URL } from "../../constants/api";
+import AIMessage from "../../components/AIMessage";
 
 export default function AIScreen() {
   const { user } = useUser();
@@ -125,6 +126,15 @@ export default function AIScreen() {
     setIsLoading(true);
 
     try {
+      // Prepare conversation history for the API
+      const conversationHistory = messages
+        .filter(msg => msg.type === 'user' || msg.type === 'ai')
+        .map(msg => ({
+          role: msg.type === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        }))
+        .slice(-10); // Keep last 10 messages to avoid token limits
+
       console.log("user?.id", user?.id);
       const response = await fetch(`${API_URL}/ai/chat`, {
         method: 'POST',
@@ -133,7 +143,8 @@ export default function AIScreen() {
         },
         body: JSON.stringify({
           message: question,
-          userId: user?.id || 'anonymous' // Dynamic user ID from Clerk auth
+          userId: user?.id || 'anonymous', // Dynamic user ID from Clerk auth
+          conversationHistory: conversationHistory
         })
       });
 
@@ -181,46 +192,23 @@ export default function AIScreen() {
     }
   };
 
-  // Render text with RTF-style formatting
-  const renderFormattedText = (content) => {
-    const parts = content.split(/(\*\*.*?\*\*)/g);
-    
-    return parts.map((part, index) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        const boldText = part.slice(2, -2);
-        return (
-          <Text key={`bold-${index}-${boldText.slice(0, 10)}`} style={styles.chatgptHeading}>
-            {boldText}
-          </Text>
-        );
-      }
-      // Handle line breaks properly
-      const textParts = part.split(/\n/);
-      return textParts.map((textPart, textIndex) => (
-        <Text key={`text-${index}-${textIndex}-${textPart.slice(0, 10)}`}>
-          {textPart}
-          {textIndex < textParts.length - 1 && '\n'}
-        </Text>
-      ));
-    });
-  };
-
-  // Format AI messages with RTF-style formatting
-  const formatAIMessage = (content) => {
-    // Clean up content and remove unwanted characters
-    let formattedContent = content
-      .replace(/[^\w\s*\-.,!?():]/g, '') // Remove unwanted characters except basic punctuation
-      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-      .replace(/\n\s*\n/g, '\n\n') // Clean up multiple newlines
-      .trim();
-
-    // Add section headers with bold formatting (keep ** for detection)
-    formattedContent = formattedContent
-      .replace(/(\n|^)(\d+\.\s*[A-Z][^.\n]*)/g, '$1\n**$2**\n')
-      .replace(/(\n|^)([A-Z][^.\n]*:)/g, '$1\n**$2**\n')
-      .replace(/(\n|^)(Summary|Analysis|Recommendations?|Insights?|Key Points?):/g, '$1\n\n**$1:**\n');
-
-    return formattedContent;
+  // Clear conversation history
+  const clearConversation = () => {
+    Alert.alert(
+      "Clear Conversation",
+      "Are you sure you want to clear the conversation history?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: () => setMessages([])
+        }
+      ]
+    );
   };
 
   return (
@@ -244,6 +232,7 @@ export default function AIScreen() {
               <Ionicons name="chatbubble-ellipses" size={32} color={COLORS.primary} />
         </View>
             <Text style={styles.chatgptWelcomeTitle}>How can I help you today?</Text>
+            
             
             {/* Sample Questions */}
             <View style={styles.chatgptSuggestions}>
@@ -285,11 +274,11 @@ export default function AIScreen() {
                 <View style={styles.chatgptUserBubble}>
                   <Text style={styles.chatgptUserText}>
                     {message.content}
-              </Text>
-            </View>
+                  </Text>
+                </View>
               ) : (
                 <View style={styles.chatgptMessageText}>
-                  {renderFormattedText(formatAIMessage(message.content))}
+                  <AIMessage reply={message.content} />
                 </View>
               )}
             </View>
@@ -318,6 +307,17 @@ export default function AIScreen() {
       
       {/* CHATGPT INPUT BAR */}
       <View style={styles.chatgptInputContainer}>
+        {/* Clear Conversation Button */}
+        {messages.length > 0 && (
+          <TouchableOpacity 
+            style={styles.clearConversationButton}
+            onPress={clearConversation}
+          >
+            <Ionicons name="trash-outline" size={16} color={COLORS.textLight} />
+            <Text style={styles.clearConversationText}>Clear</Text>
+          </TouchableOpacity>
+        )}
+        
         <View style={styles.chatgptInputWrapper}>
           <TextInput
             style={styles.chatgptInput}

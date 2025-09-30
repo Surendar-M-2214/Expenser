@@ -22,7 +22,7 @@ export const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "600",
     color: COLORS.text,
   },
@@ -224,5 +224,9 @@ export const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textLight,
     textAlign: 'center',
+  },
+  dateInputTouchable: {
+    flex: 1,
+    justifyContent: 'center',
   },
 });

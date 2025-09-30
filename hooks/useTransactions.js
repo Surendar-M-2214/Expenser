@@ -175,6 +175,15 @@ export const useTransactions = (userId) => {
     }
   }, [userId, session]);
 
+  // Update transaction in local state (for immediate UI update)
+  const updateTransactionInState = useCallback((updatedTransaction) => {
+    setTransactions(prev => 
+      prev.map(transaction => 
+        transaction.id === updatedTransaction.id ? updatedTransaction : transaction
+      )
+    );
+  }, []);
+
   return {
     // Data
     transactions,
@@ -188,6 +197,7 @@ export const useTransactions = (userId) => {
     fetchSummary,
     createTransaction,
     updateTransaction,
+    updateTransactionInState,
     deleteTransaction,
     bulkDeleteTransactions,
     getTransactionsWithFilters,

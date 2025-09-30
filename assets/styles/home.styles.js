@@ -229,6 +229,12 @@ export const  styles = StyleSheet.create({
     color: COLORS.textLight,
     marginBottom: 8,
   },
+  transactionReference: {
+    fontSize: 11,
+    color: COLORS.textLight,
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
   transactionRight: {
     alignItems: "flex-end",
     justifyContent: "flex-start",
@@ -614,6 +620,7 @@ export const  styles = StyleSheet.create({
   },
   chatgptAiMessage: {
     backgroundColor: 'transparent',
+  
   },
   chatgptUserBubble: {
     backgroundColor: COLORS.primary,
@@ -625,11 +632,12 @@ export const  styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   chatgptUserText: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#ffffff',
     lineHeight: 24,
   },
   chatgptMessageContent: {
+    
     flexDirection: 'row',
     alignItems: 'flex-start',
     maxWidth: '100%',
@@ -649,13 +657,6 @@ export const  styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 26,
     color: COLORS.text,
-  },
-  chatgptHeading: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginVertical: 4,
-    lineHeight: 24,
   },
   chatgptTyping: {
     flexDirection: 'row',
@@ -714,6 +715,195 @@ export const  styles = StyleSheet.create({
   chatgptSendButtonDisabled: {
     backgroundColor: COLORS.textLight,
   },
+  clearConversationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    backgroundColor: 'transparent',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.textLight,
+  },
+  clearConversationText: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    marginLeft: 4,
+  },
+  // Transaction Preview Modal Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalCloseButton: {
+    padding: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  modalEditButton: {
+    padding: 10,
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  transactionPreviewIcon: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  transactionIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  transactionDetails: {
+    marginTop: 8,
+  },
+  detailRow: {
+    marginBottom: 20,
+  },
+  detailLabel: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: COLORS.textLight,
+    marginBottom: 8,
+  },
+  detailValue: {
+    fontSize: 20,
+    color: COLORS.text,
+  },
+  amountValue: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  detailInput: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: COLORS.text,
+    backgroundColor: COLORS.background,
+  },
+  amountInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: COLORS.background,
+  },
+  currencySymbol: {
+    fontSize: 16,
+    color: COLORS.text,
+    marginRight: 8,
+  },
+  amountInput: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.text,
+  },
+  categoryScroll: {
+    marginTop: 8,
+  },
+  categoryChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginRight: 8,
+  },
+  categoryChipSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  categoryChipText: {
+    fontSize: 14,
+    color: COLORS.text,
+  },
+  categoryChipTextSelected: {
+    color: COLORS.white,
+  },
+  typeContainer: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  typeButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginRight: 8,
+    alignItems: 'center',
+  },
+  typeButtonSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  typeButtonText: {
+    fontSize: 14,
+    color: COLORS.text,
+  },
+  typeButtonTextSelected: {
+    color: COLORS.white,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    color: COLORS.text,
+  },
+  saveButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
   messageContainer: {
     marginBottom: 12,
   },
@@ -748,7 +938,7 @@ export const  styles = StyleSheet.create({
     elevation: 2,
   },
   messageText: {
-    fontSize: 14,
+    fontSize: 18,
     lineHeight: 22,
   },
   userMessageText: {
@@ -758,6 +948,7 @@ export const  styles = StyleSheet.create({
     color: COLORS.text,
     flex: 1,
     lineHeight: 22,
+    
   },
   aiMessage: {
     flexDirection: "row",
@@ -824,7 +1015,7 @@ export const  styles = StyleSheet.create({
     marginBottom: 4,
   },
   aiFeatureDescription: {
-    fontSize: 14,
+    fontSize: 20,
     color: COLORS.textLight,
     lineHeight: 20,
   },
@@ -1052,6 +1243,25 @@ export const  styles = StyleSheet.create({
     color: COLORS.text,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  // Upload Modal Styles
+  modalContent: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  scrollableContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  fixedActionButtons: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingBottom: 34, // Extra padding for safe area
+    backgroundColor: COLORS.background,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    gap: 12,
   },
 
 });

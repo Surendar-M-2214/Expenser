@@ -44,15 +44,16 @@ export default function ProfileModal({ visible, onClose, onProfileUpdated }) {
 
   useEffect(() => {
     if (user) {
+      // Initialize with empty values - database will populate them
       setProfileData({
-        firstName: user.firstName || '',
-        lastName: user.lastName || '',
-        username: user.username || '',
+        firstName: '',
+        lastName: '',
+        username: '',
         email: user.emailAddresses[0]?.emailAddress || '',
-        phoneNumber: user.phoneNumbers[0]?.phoneNumber || '',
-        profileImage: user.imageUrl || null, // Will be overridden by database data
+        phoneNumber: '',
+        profileImage: null,
       });
-      // Load profile image from database (this will override Clerk's imageUrl)
+      // Load profile data from database - SINGLE SOURCE OF TRUTH
       loadProfileImageFromDatabase();
     }
   }, [user]);
@@ -93,27 +94,44 @@ export default function ProfileModal({ visible, onClose, onProfileUpdated }) {
       if (response.ok) {
         try {
           const result = await response.json();
-          // console.log('Profile data from database:', result);
+          console.log('Profile data from database:', result);
           
           if (result.user) {
+            // Use ONLY database data - no Clerk fallbacks
+            setProfileData({
+              firstName: result.user.firstName || '',
+              lastName: result.user.lastName || '',
+              username: result.user.username || '',
+              email: result.user.email || user.emailAddresses[0]?.emailAddress || '',
+              phoneNumber: result.user.phoneNumber || '',
+              profileImage: result.user.profileImage || null,
+            });
+            console.log('Profile data updated from database, profileImage:', result.user.profileImage);
+          } else {
+            // If no user data, keep only email from Clerk
             setProfileData(prev => ({
               ...prev,
-              firstName: result.user.firstName || prev.firstName,
-              lastName: result.user.lastName || prev.lastName,
-              username: result.user.username || prev.username,
-              phoneNumber: result.user.phoneNumber || prev.phoneNumber,
-              profileImage: result.user.profileImage || prev.profileImage,
+              email: user.emailAddresses[0]?.emailAddress || '',
             }));
-            // console.log('Profile data updated from database, profileImage:', result.user.profileImage);
           }
         } catch (parseError) {
           console.log('Could not parse profile response:', parseError);
         }
       } else {
         console.log('Failed to load profile data:', response.status);
+        // Keep only email from Clerk on error
+        setProfileData(prev => ({
+          ...prev,
+          email: user.emailAddresses[0]?.emailAddress || '',
+        }));
       }
     } catch (error) {
       console.log('Could not load profile data from database:', error);
+      // Keep only email from Clerk on error
+      setProfileData(prev => ({
+        ...prev,
+        email: user.emailAddresses[0]?.emailAddress || '',
+      }));
     }
   };
 
@@ -128,8 +146,8 @@ export default function ProfileModal({ visible, onClose, onProfileUpdated }) {
       return true;
     }
 
-    // Don't check if it's the current user's username
-    if (usernameToCheck.trim() === (user.username || '')) {
+    // Don't check if it's the current user's username (from database)
+    if (usernameToCheck.trim() === profileData.username) {
       setUsernameError('');
       return true;
     }
@@ -261,17 +279,16 @@ export default function ProfileModal({ visible, onClose, onProfileUpdated }) {
 
       console.log('Available user methods:', Object.getOwnPropertyNames(user).filter(name => typeof user[name] === 'function'));
 
-      // Check if we have any changes to make
-      const hasChanges = profileData.firstName !== (user.firstName || '') || 
-                         profileData.lastName !== (user.lastName || '') ||
-                         profileData.username !== (user.username || '') ||
-                         profileData.phoneNumber !== (user.phoneNumbers[0]?.phoneNumber || '') ||
-                         profileData.profileImage !== (user.imageUrl || '');
+      // Check if we have any meaningful changes to make
+      const hasChanges = profileData.firstName.trim() !== '' || 
+                         profileData.lastName.trim() !== '' ||
+                         profileData.username.trim() !== '' ||
+                         profileData.phoneNumber.trim() !== '';
       
       // If no changes, just exit edit mode
       if (!hasChanges) {
         console.log('No changes detected');
-        Alert.alert('No Changes', 'No changes were made to your profile.');
+        Alert.alert('No Changes', 'Please fill in at least one field to update your profile.');
         setIsEditing(false);
         return;
       }
@@ -287,23 +304,21 @@ export default function ProfileModal({ visible, onClose, onProfileUpdated }) {
           console.log('User object:', user);
           console.log('Session object:', session);
           
-          // Prepare update data - only include fields that have meaningful changes
+          // Prepare update data - only include fields that have meaningful values
           const updateData = {};
-          if (profileData.firstName !== (user.firstName || '') && profileData.firstName.trim() !== '') {
+          if (profileData.firstName.trim() !== '') {
             updateData.firstName = profileData.firstName.trim();
           }
-          if (profileData.lastName !== (user.lastName || '') && profileData.lastName.trim() !== '') {
+          if (profileData.lastName.trim() !== '') {
             updateData.lastName = profileData.lastName.trim();
           }
-          if (profileData.username !== (user.username || '') && profileData.username.trim() !== '') {
+          if (profileData.username.trim() !== '') {
             updateData.username = profileData.username.trim();
           }
-          if (profileData.phoneNumber !== (user.phoneNumbers[0]?.phoneNumber || '') && profileData.phoneNumber.trim() !== '') {
+          if (profileData.phoneNumber.trim() !== '') {
             updateData.phoneNumber = profileData.phoneNumber.trim();
           }
-          if (profileData.profileImage !== (user.imageUrl || '') && profileData.profileImage) {
-            updateData.profile_image = profileData.profileImage;
-          }
+          // Don't include profile_image in profile update - it should be uploaded separately
           
           console.log('Updating profile via backend:', updateData);
           console.log('API URL:', `${API_URL}/users/profile`);
@@ -331,18 +346,9 @@ export default function ProfileModal({ visible, onClose, onProfileUpdated }) {
             const result = await response.json();
             console.log('Profile updated successfully:', result);
             
-            // Reload user data to get the updated information
-            try {
-              await user.reload();
-              console.log('User data reloaded successfully');
-              
-              // Also reload profile data from database
-              await loadProfileImageFromDatabase();
-              console.log('Profile data reloaded from database');
-            } catch (reloadError) {
-              console.warn('Could not reload user data:', reloadError);
-              // Don't throw error here as the update was successful
-            }
+            // Reload profile data from database - SINGLE SOURCE OF TRUTH
+            await loadProfileImageFromDatabase();
+            console.log('Profile data reloaded from database');
           } else {
             let errorData = { error: 'Unknown error' };
             
@@ -358,6 +364,11 @@ export default function ProfileModal({ visible, onClose, onProfileUpdated }) {
               } else {
                 // Try to parse as JSON
                 errorData = JSON.parse(responseText);
+                
+                // Handle the new JSON error format
+                if (errorData.success === false) {
+                  errorData.error = errorData.details || errorData.error || 'Profile update failed';
+                }
               }
         } catch (parseError) {
           console.error('Could not parse error response:', parseError);
@@ -365,6 +376,10 @@ export default function ProfileModal({ visible, onClose, onProfileUpdated }) {
           // If we can't parse the response, provide a generic error based on status code
           if (response.status === 404) {
             errorData.error = 'Profile endpoint not found. Please contact support.';
+          } else if (response.status === 401) {
+            errorData.error = 'Authentication failed. Please sign in again.';
+          } else if (response.status === 413) {
+            errorData.error = 'Image too large. Please select a smaller image (max 10MB).';
           } else if (response.status >= 500) {
             errorData.error = 'Server error. Please try again later.';
           } else {
@@ -436,29 +451,20 @@ export default function ProfileModal({ visible, onClose, onProfileUpdated }) {
   };
 
   const handleCancel = () => {
-    // Reset to original data from database
-    loadProfileImageFromDatabase().then(() => {
-      setProfileData(prev => ({
-        ...prev,
-        firstName: user.firstName || '',
-        lastName: user.lastName || '',
-        username: user.username || '',
-        email: user.emailAddresses[0]?.emailAddress || '',
-        phoneNumber: user.phoneNumbers[0]?.phoneNumber || '',
-        // profileImage will be set by loadProfileImageFromDatabase
-      }));
-    });
+    // Reset to original data from database - SINGLE SOURCE OF TRUTH
+    loadProfileImageFromDatabase();
     setUsernameError('');
     setIsEditing(false);
   };
 
-  const pickImage = async () => {
+      const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: IMAGE_MEDIA_TYPE,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.7, // Reduced quality to reduce file size
+        compress: 0.8, // Additional compression
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -475,7 +481,8 @@ export default function ProfileModal({ visible, onClose, onProfileUpdated }) {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.7, // Reduced quality to reduce file size
+        compress: 0.8, // Additional compression
       });
 
       if (!result.canceled && result.assets[0]) {
@@ -490,6 +497,23 @@ export default function ProfileModal({ visible, onClose, onProfileUpdated }) {
   const uploadProfileImage = async (imageUri) => {
     setUploadingImage(true);
     try {
+      // Check image size before uploading
+      const sizeResponse = await fetch(imageUri);
+      const blob = await sizeResponse.blob();
+      const fileSizeInMB = blob.size / (1024 * 1024);
+      
+      console.log('Image size:', fileSizeInMB.toFixed(2), 'MB');
+      
+      if (fileSizeInMB > 10) {
+        Alert.alert(
+          'Image Too Large', 
+          `Image size is ${fileSizeInMB.toFixed(2)}MB. Please select an image smaller than 10MB.`,
+          [{ text: 'OK' }]
+        );
+        setUploadingImage(false);
+        return;
+      }
+      
       const token = await session?.getToken();
       
       // Create FormData for file upload

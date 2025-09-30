@@ -1,20 +1,22 @@
-import { View, Text, FlatList, TouchableOpacity, RefreshControl } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert } from "react-native";
 import { useUser } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useTransactions } from "../../hooks/useTransactions";
 import { TransactionItem } from "../../components/TransactionItem";
+import TransactionPreviewModal from "../../components/TransactionPreviewModal";
 import { styles } from "../../assets/styles/home.styles";
 import { COLORS } from "../../constants/colors";
-import { Alert } from "react-native";
 
 export default function TransactionsScreen() {
   const { user } = useUser();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
-  const { transactions, isLoading, loadData, deleteTransaction } = useTransactions(user.id);
+  const { transactions, loadData, deleteTransaction, updateTransactionInState } = useTransactions(user.id);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -31,6 +33,23 @@ export default function TransactionsScreen() {
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: () => deleteTransaction(id) },
     ]);
+  };
+
+  const handleTransactionPress = (transaction) => {
+    setSelectedTransaction(transaction);
+    setModalVisible(true);
+  };
+
+  const handleModalClose = () => {
+    setModalVisible(false);
+    setSelectedTransaction(null);
+  };
+
+  const handleTransactionUpdate = (updatedTransaction) => {
+    // Update the transaction in the local state
+    updateTransactionInState(updatedTransaction);
+    setModalVisible(false);
+    setSelectedTransaction(null);
   };
 
   return (
@@ -54,7 +73,13 @@ export default function TransactionsScreen() {
         style={styles.transactionsList}
         contentContainerStyle={styles.transactionsListContent}
         data={transactions}
-        renderItem={({ item }) => <TransactionItem item={item} onDelete={handleDelete} />}
+        renderItem={({ item }) => (
+          <TransactionItem 
+            item={item} 
+            onDelete={handleDelete} 
+            onPress={handleTransactionPress}
+          />
+        )}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -69,6 +94,14 @@ export default function TransactionsScreen() {
             </Text>
           </View>
         }
+      />
+      
+      {/* TRANSACTION PREVIEW MODAL */}
+      <TransactionPreviewModal
+        visible={modalVisible}
+        transaction={selectedTransaction}
+        onClose={handleModalClose}
+        onUpdate={handleTransactionUpdate}
       />
     </View>
   );
